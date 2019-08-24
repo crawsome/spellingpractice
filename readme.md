@@ -1,6 +1,7 @@
 # spellingpractice
 *2018 Colin Burke*
-practice spelling with an assortment of features, dictionary lookup, and text-to-speech
+
+Practice spelling with an assortment of features, dictionary lookup, and text-to-speech
 
 ## How to use:
 Currently, run test.py. Here are the features:
