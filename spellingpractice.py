@@ -1,10 +1,11 @@
 import pyttsx3
 import random
+from difflib import SequenceMatcher
+from PyDictionary import PyDictionary
 
 
 # 2018 Colin Burke
 # practice spelling with an assortment of features, and text-to-speech!
-
 
 class spelling_game():
     def __init__(self):
@@ -12,7 +13,8 @@ class spelling_game():
         self.engine = pyttsx3.init()
         self.original_rate = self.engine.getProperty('rate')
         self.rate = self.original_rate
-        self.engine.setProperty('rate', self.rate - 50)
+        self.engine.setProperty('rate', self.rate)
+        self.dictionary = PyDictionary()
 
         # alternate voices
         self.voices = self.engine.getProperty('voices')
@@ -22,6 +24,7 @@ class spelling_game():
         # our word
         self.word = ''
         self.obs_word = ''
+        self.attempt = ''
         self.right = 0
         self.wrong = 0
         self.our_excuse = ''
@@ -44,13 +47,14 @@ class spelling_game():
         self.gradeslist.extend((grade1_2, grade3_4, grade5_6, grade7_8, grade9_12, grade13_16))
 
         # category names and excuses for getting it wrong
-        self.gradenames = ['Kindergarten through 2nd grade. 2 to 4-letter words',
-                           '3rd through 5th grade. 4 to 5-letter words',
-                           '6th through 8th grade. 5 to 6-letter words', '9th through 12th grade. 6 to 7-letter words',
-                           'College and beyond. 7 to 9-letter words',
-                           'Challenge Mode for The mighty. 9 letters and above']
-        self.excuses = [' I want a Hint',
-                        'I need to hear it in a sentence',
+        self.gradenames = ['2 to 4-letter words',
+                           '4 to 5-letter words',
+                           '5 to 6-letter words',
+                           '6 to 7-letter words',
+                           '7 to 9-letter words',
+                           'Challenge Mode: 9 letters and above']
+        self.excuses = ['I want a Hint',
+                        'I need to hear it\'s definition',
                         'Word is not clear',
                         'Word is not a great spelling word, or an edge case',
                         'Word is obscene',
@@ -59,11 +63,11 @@ class spelling_game():
                         'I\'d like to hear it in a different voice']
         self.index_words = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth',
                             'tenth', 'eleventh', 'twelveth', 'thirteenth', 'fourteenth', 'fifteenth', 'sixteenth',
-                            'seventeenth', 'eighteenth', 'ninteenth', 'twentyith']
+                            'seventeenth', 'eighteenth', 'ninteenth', 'twentyth']
         self.say_fast('Welcome to Spelling Practice!')
         self.say_fast('Please enter your name')
         self.name = input('Your name? ')
-        self.say_slowly('Hi ' + self.name)
+        self.say_fast('Hi ' + self.name)
 
     def say_slowly(self, a_word):
         self.rate = 100
@@ -72,22 +76,18 @@ class spelling_game():
         self.engine.runAndWait()
 
     def say_fast(self, a_word):
-        self.engine.setProperty('rate', self.rate)
-        self.engine.say(a_word)
-        # optionally print the word, too
-        # print('\n'+ a_word)
-        self.engine.runAndWait()
-
-    def say_slower(self, a_word):
-        self.rate -= 20
+        self.rate = 200
         self.engine.setProperty('rate', self.rate)
         self.engine.say(a_word)
         self.engine.runAndWait()
 
-    def say_faster(self, a_word):
-        self.engine.setProperty('rate', self.rate - 100)
-        self.engine.say(a_word)
-        self.engine.runAndWait()
+    def say_slower(self):
+        self.rate -= 25
+        self.engine.setProperty('rate', self.rate)
+
+    def say_faster(self):
+        self.rate += 25
+        self.engine.setProperty('rate', self.rate)
 
     def next_voice(self):
         self.say_fast('There are ' + str(self.voices_count) + ' voices available to use. Use next one?')
@@ -115,7 +115,8 @@ class spelling_game():
         self.our_excuse = input()
         # process the excuse
         self.say_fast('You said: ' + str(self.excuses[int(self.our_excuse) - 1]))
-        excuse_functions = [self.hint, self.hear_in_sentence, self.exclude_word, self.say_slower, self.say_faster,
+        excuse_functions = [self.hint, self.hear_definition, self.say_slower, self.exclude_word, self.exclude_word,
+                            self.say_faster, self.say_slower,
                             self.next_voice]
         excuse_functions[int(self.our_excuse) - 1]()
         # 1. I want a Hint - give hint
@@ -129,10 +130,20 @@ class spelling_game():
 
     # obscures a word with asterisks, used for a step-by-step hint method
     def hint(self):
-        self.hintlevel += 1
-        self.obs_word = ['*' for char in range(len(self.word))]
-        for limit, letter in zip(range(self.hintlevel), self.word):
-            self.say_fast(letter)
+        print('You were ' + str(self.string_likeness(self.attempt, self.word)) + '% close to the answer.')
+        print('Your answer : ' + repr(self.attempt))
+        if len(self.word) != len(self.attempt):
+            print('Length of correct answer : ' + str(len(self.word)))
+            print('Length of your answer : ' + str(len(self.attempt)))
+            print('please try again with the right amount of characters')
+        else:
+            print('Right answer: ' + repr(self.word))
+            diffstring = ''
+            self.obs_word = str('*' for y in range(len(self.word)))
+            print(self.obs_word)
+            for limit, letter in zip(self.attempt, self.word):
+                print('')
+                self.say_fast(letter)
 
     def quiz_word(self):
         self.word = random.choice(self.ourwords)
@@ -141,33 +152,56 @@ class spelling_game():
         while not correct:
             self.say_fast('Please spell the word.')
             self.say_slowly(self.word)
-            self.say_fast('Enter r to hear again, or h for help, q to quit')
-            attempt = str(input('Your answer: ')).lower()
-            if attempt == 'r':
+            self.say_fast('Enter r to hear again, or h for help, q to quit, or g to give up')
+            self.attempt = str(input('Your answer: ')).lower()
+            if self.attempt == 'r':
+                continue
+            elif self.attempt == 'h':
                 self.say_fast('What was your issue?')
                 self.get_excuse()
                 continue
-            elif attempt == 'q':
+            elif self.attempt == 'q':
                 self.say_fast('Thanks for playing. Good-Bye!')
                 quit()
-            elif attempt == 'h':
-                self.hint()
-            elif attempt == self.word:
+            elif self.attempt == 'g':
+                self.say_fast('You quitter!')
+                self.spell_word()
+                quit()
+            elif self.attempt == self.word:
                 self.say_fast('Correct! Great Job!')
                 correct = True
             else:
-                self.say_fast('INCORRECT, TRY AGAIN?')
-            print('Your answer : ' + repr(attempt))
-            print('Right answer: ' + repr(self.word))
+                self.say_fast('Please try again')
+                self.hint()
+                continue
 
-    def hear_in_sentence(self):
-        pass
+    def hear_definition(self):
+        ourdef = self.dictionary.meaning(self.word)
+        if ourdef is None:
+            self.say_fast('No definition available for this word')
+        try:
+            self.say_slowly(ourdef)
+        except UserWarning:
+            pass
 
+
+    # doesn't actually exclude the word yet, just comforts the user in jest
     def exclude_word(self):
+        self.say_fast('Sorry you had to deal with that obscene word. I hope you\'re okay')
         pass
 
     def new_word(self):
         pass
 
+    def spell_word(self):
+        print(self.word)
+        for letter in self.word:
+            self.say_fast(letter)
+
     def quiz_x_words(self):
         self.say_fast('How many words will be in your quiz?')
+
+    # if string is at least 80% similar, will return true
+    def string_likeness(self, str1, str2):
+        likeness = SequenceMatcher(None, str1, str2).ratio()
+        return str(f'{likeness:.2f}')
